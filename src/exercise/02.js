@@ -3,13 +3,34 @@
 
 import * as React from 'react'
 
-function useLocalStorageState(key, initialValue='') {
-  const [value, setValue] = React.useState(
-    () => window.localStorage.getItem(key) ?? initialValue,
-  )
+function useLocalStorageState(
+  key,
+  initialValue = '',
+  {serialize = JSON.stringify, deserialize = JSON.parse} = {},
+) {
+  const [value, setValue] = React.useState(() => {
+    const storageValue = window.localStorage.getItem(key)
+    if (storageValue) {
+      try {
+        return deserialize(storageValue)
+      } catch (e) {
+        window.localStorage.removeItem(key)
+      }
+    }
+    return typeof initialValue === 'function' ? initialValue() : initialValue
+  })
+
+  const prevKeyRef = React.useRef(key)
+
+  // Check the example at src/examples/local-state-key-change.js to visualize a key change
   React.useEffect(() => {
-    window.localStorage.setItem(key, value)
-  }, [value])
+    const prevKey = prevKeyRef.current
+    if (prevKey !== key) {
+      window.localStorage.removeItem(prevKey)
+    }
+    prevKeyRef.current = key
+    window.localStorage.setItem(key, serialize(value))
+  }, [key, value, serialize])
 
   return [value, setValue]
 }
